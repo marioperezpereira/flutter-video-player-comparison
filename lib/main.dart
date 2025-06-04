@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:pod_player/pod_player.dart';
 
@@ -226,17 +225,64 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     child: VideoPlayer(_controller),
                   ),
                   const SizedBox(height: 20),
-                  _buildControls(),
+                  VideoPlayerControls(
+                    controller: _controller,
+                    volume: _volume,
+                    playbackSpeed: _playbackSpeed,
+                    onVolumeChanged: (value) {
+                      setState(() {
+                        _volume = value;
+                        _controller.setVolume(value);
+                      });
+                    },
+                    onPlaybackSpeedChanged: (speed) {
+                      setState(() {
+                        _playbackSpeed = speed;
+                        _controller.setPlaybackSpeed(speed);
+                      });
+                    },
+                    onPlayPausePressed: () {
+                      setState(() {
+                        _controller.value.isPlaying
+                            ? _controller.pause()
+                            : _controller.play();
+                      });
+                    },
+                  ),
                   const SizedBox(height: 20),
-                  _buildVideoInfo(),
+                  VideoPlayerInfo(
+                    controller: _controller,
+                    volume: _volume,
+                    playbackSpeed: _playbackSpeed,
+                  ),
                 ],
               ),
             )
           : const Center(child: CircularProgressIndicator()),
     );
   }
+}
 
-  Widget _buildControls() {
+class VideoPlayerControls extends StatelessWidget {
+  final VideoPlayerController controller;
+  final double volume;
+  final double playbackSpeed;
+  final ValueChanged<double> onVolumeChanged;
+  final ValueChanged<double> onPlaybackSpeedChanged;
+  final VoidCallback onPlayPausePressed;
+
+  const VideoPlayerControls({
+    super.key,
+    required this.controller,
+    required this.volume,
+    required this.playbackSpeed,
+    required this.onVolumeChanged,
+    required this.onPlaybackSpeedChanged,
+    required this.onPlayPausePressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -246,37 +292,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               IconButton(
-                onPressed: () {
-                  setState(() {
-                    _controller.value.isPlaying
-                        ? _controller.pause()
-                        : _controller.play();
-                  });
-                },
+                onPressed: onPlayPausePressed,
                 icon: Icon(
-                  _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                  controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
                   size: 32,
                 ),
               ),
               IconButton(
                 onPressed: () {
-                  _controller.seekTo(Duration.zero);
+                  controller.seekTo(Duration.zero);
                 },
                 icon: const Icon(Icons.replay, size: 32),
               ),
               IconButton(
                 onPressed: () {
-                  final position = _controller.value.position;
+                  final position = controller.value.position;
                   final newPosition = position - const Duration(seconds: 10);
-                  _controller.seekTo(newPosition);
+                  controller.seekTo(newPosition);
                 },
                 icon: const Icon(Icons.replay_10, size: 32),
               ),
               IconButton(
                 onPressed: () {
-                  final position = _controller.value.position;
+                  final position = controller.value.position;
                   final newPosition = position + const Duration(seconds: 10);
-                  _controller.seekTo(newPosition);
+                  controller.seekTo(newPosition);
                 },
                 icon: const Icon(Icons.forward_10, size: 32),
               ),
@@ -286,7 +326,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           
           // Progress bar
           VideoProgressIndicator(
-            _controller,
+            controller,
             allowScrubbing: true,
             padding: const EdgeInsets.symmetric(horizontal: 16),
           ),
@@ -299,13 +339,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               const Icon(Icons.volume_down),
               Expanded(
                 child: Slider(
-                  value: _volume,
-                  onChanged: (value) {
-                    setState(() {
-                      _volume = value;
-                      _controller.setVolume(value);
-                    });
-                  },
+                  value: volume,
+                  onChanged: onVolumeChanged,
                 ),
               ),
               const Icon(Icons.volume_up),
@@ -317,7 +352,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             children: [
               const Text('Speed: '),
               DropdownButton<double>(
-                value: _playbackSpeed,
+                value: playbackSpeed,
                 items: [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
                     .map((speed) => DropdownMenuItem(
                           value: speed,
@@ -326,10 +361,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     .toList(),
                 onChanged: (speed) {
                   if (speed != null) {
-                    setState(() {
-                      _playbackSpeed = speed;
-                      _controller.setPlaybackSpeed(speed);
-                    });
+                    onPlaybackSpeedChanged(speed);
                   }
                 },
               ),
@@ -339,10 +371,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
     );
   }
+}
 
-  Widget _buildVideoInfo() {
-    final duration = _controller.value.duration;
-    final position = _controller.value.position;
+class VideoPlayerInfo extends StatelessWidget {
+  final VideoPlayerController controller;
+  final double volume;
+  final double playbackSpeed;
+
+  const VideoPlayerInfo({
+    super.key,
+    required this.controller,
+    required this.volume,
+    required this.playbackSpeed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = controller.value.duration;
+    final position = controller.value.position;
     
     return Card(
       margin: const EdgeInsets.all(16),
@@ -358,12 +404,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             const SizedBox(height: 8),
             Text('Duration: ${_formatDuration(duration)}'),
             Text('Position: ${_formatDuration(position)}'),
-            Text('Aspect Ratio: ${_controller.value.aspectRatio.toStringAsFixed(2)}'),
-            Text('Volume: ${(_volume * 100).toInt()}%'),
-            Text('Playback Speed: ${_playbackSpeed}x'),
+            Text('Aspect Ratio: ${controller.value.aspectRatio.toStringAsFixed(2)}'),
+            Text('Volume: ${(volume * 100).toInt()}%'),
+            Text('Playback Speed: ${playbackSpeed}x'),
             Text('Auto-play: Enabled'),
-            Text('Is Playing: ${_controller.value.isPlaying}'),
-            Text('Is Buffering: ${_controller.value.isBuffering}'),
+            Text('Is Playing: ${controller.value.isPlaying}'),
+            Text('Is Buffering: ${controller.value.isBuffering}'),
           ],
         ),
       ),
@@ -498,7 +544,16 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
               bottom: 20,
               left: 20,
               right: 20,
-              child: _buildMinimalControls(),
+              child: MinimalVideoControls(
+                controller: _controller,
+                onPlayPausePressed: () {
+                  setState(() {
+                    _controller.value.isPlaying
+                        ? _controller.pause()
+                        : _controller.play();
+                  });
+                },
+              ),
             ),
           ],
         ),
@@ -542,17 +597,56 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _buildControls(),
+                  EnhancedVideoPlayerControls(
+                    controller: _controller,
+                    volume: _volume,
+                    playbackSpeed: _playbackSpeed,
+                    onVolumeChanged: (value) {
+                      setState(() {
+                        _volume = value;
+                        _controller.setVolume(value);
+                      });
+                    },
+                    onPlaybackSpeedChanged: (speed) {
+                      setState(() {
+                        _playbackSpeed = speed;
+                        _controller.setPlaybackSpeed(speed);
+                      });
+                    },
+                    onPlayPausePressed: () {
+                      setState(() {
+                        _controller.value.isPlaying
+                            ? _controller.pause()
+                            : _controller.play();
+                      });
+                    },
+                  ),
                   const SizedBox(height: 20),
-                  _buildEnhancedVideoInfo(),
+                  EnhancedVideoPlayerInfo(
+                    controller: _controller,
+                    volume: _volume,
+                    playbackSpeed: _playbackSpeed,
+                  ),
                 ],
               ),
             )
           : const Center(child: CircularProgressIndicator()),
     );
   }
+}
 
-  Widget _buildMinimalControls() {
+class MinimalVideoControls extends StatelessWidget {
+  final VideoPlayerController controller;
+  final VoidCallback onPlayPausePressed;
+
+  const MinimalVideoControls({
+    super.key,
+    required this.controller,
+    required this.onPlayPausePressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -563,15 +657,9 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
-            onPressed: () {
-              setState(() {
-                _controller.value.isPlaying
-                    ? _controller.pause()
-                    : _controller.play();
-              });
-            },
+            onPressed: onPlayPausePressed,
             icon: Icon(
-              _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+              controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
               color: Colors.white,
               size: 30,
             ),
@@ -579,7 +667,7 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
           const SizedBox(width: 16),
           Expanded(
             child: VideoProgressIndicator(
-              _controller,
+              controller,
               allowScrubbing: true,
               colors: const VideoProgressColors(
                 playedColor: Colors.red,
@@ -591,8 +679,28 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
       ),
     );
   }
+}
 
-  Widget _buildControls() {
+class EnhancedVideoPlayerControls extends StatelessWidget {
+  final VideoPlayerController controller;
+  final double volume;
+  final double playbackSpeed;
+  final ValueChanged<double> onVolumeChanged;
+  final ValueChanged<double> onPlaybackSpeedChanged;
+  final VoidCallback onPlayPausePressed;
+
+  const EnhancedVideoPlayerControls({
+    super.key,
+    required this.controller,
+    required this.volume,
+    required this.playbackSpeed,
+    required this.onVolumeChanged,
+    required this.onPlaybackSpeedChanged,
+    required this.onPlayPausePressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -627,37 +735,31 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               IconButton(
-                onPressed: () {
-                  setState(() {
-                    _controller.value.isPlaying
-                        ? _controller.pause()
-                        : _controller.play();
-                  });
-                },
+                onPressed: onPlayPausePressed,
                 icon: Icon(
-                  _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                  controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
                   size: 32,
                 ),
               ),
               IconButton(
                 onPressed: () {
-                  _controller.seekTo(Duration.zero);
+                  controller.seekTo(Duration.zero);
                 },
                 icon: const Icon(Icons.replay, size: 32),
               ),
               IconButton(
                 onPressed: () {
-                  final position = _controller.value.position;
+                  final position = controller.value.position;
                   final newPosition = position - const Duration(seconds: 10);
-                  _controller.seekTo(newPosition);
+                  controller.seekTo(newPosition);
                 },
                 icon: const Icon(Icons.replay_10, size: 32),
               ),
               IconButton(
                 onPressed: () {
-                  final position = _controller.value.position;
+                  final position = controller.value.position;
                   final newPosition = position + const Duration(seconds: 10);
-                  _controller.seekTo(newPosition);
+                  controller.seekTo(newPosition);
                 },
                 icon: const Icon(Icons.forward_10, size: 32),
               ),
@@ -667,7 +769,7 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
           
           // Progress bar
           VideoProgressIndicator(
-            _controller,
+            controller,
             allowScrubbing: true,
             padding: const EdgeInsets.symmetric(horizontal: 16),
           ),
@@ -680,13 +782,8 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
               const Icon(Icons.volume_down),
               Expanded(
                 child: Slider(
-                  value: _volume,
-                  onChanged: (value) {
-                    setState(() {
-                      _volume = value;
-                      _controller.setVolume(value);
-                    });
-                  },
+                  value: volume,
+                  onChanged: onVolumeChanged,
                 ),
               ),
               const Icon(Icons.volume_up),
@@ -698,7 +795,7 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
             children: [
               const Text('Speed: '),
               DropdownButton<double>(
-                value: _playbackSpeed,
+                value: playbackSpeed,
                 items: [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
                     .map((speed) => DropdownMenuItem(
                           value: speed,
@@ -707,10 +804,7 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
                     .toList(),
                 onChanged: (speed) {
                   if (speed != null) {
-                    setState(() {
-                      _playbackSpeed = speed;
-                      _controller.setPlaybackSpeed(speed);
-                    });
+                    onPlaybackSpeedChanged(speed);
                   }
                 },
               ),
@@ -720,10 +814,24 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
       ),
     );
   }
+}
 
-  Widget _buildEnhancedVideoInfo() {
-    final duration = _controller.value.duration;
-    final position = _controller.value.position;
+class EnhancedVideoPlayerInfo extends StatelessWidget {
+  final VideoPlayerController controller;
+  final double volume;
+  final double playbackSpeed;
+
+  const EnhancedVideoPlayerInfo({
+    super.key,
+    required this.controller,
+    required this.volume,
+    required this.playbackSpeed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = controller.value.duration;
+    final position = controller.value.position;
     
     return Card(
       margin: const EdgeInsets.all(16),
@@ -757,12 +865,12 @@ class _VideoPlayerEnhancedScreenState extends State<VideoPlayerEnhancedScreen> {
             const SizedBox(height: 8),
             Text('Duration: ${_formatDuration(duration)}'),
             Text('Position: ${_formatDuration(position)}'),
-            Text('Aspect Ratio: ${_controller.value.aspectRatio.toStringAsFixed(2)}'),
-            Text('Volume: ${(_volume * 100).toInt()}%'),
-            Text('Playback Speed: ${_playbackSpeed}x'),
+            Text('Aspect Ratio: ${controller.value.aspectRatio.toStringAsFixed(2)}'),
+            Text('Volume: ${(volume * 100).toInt()}%'),
+            Text('Playback Speed: ${playbackSpeed}x'),
             Text('Auto-play: Enabled'),
-            Text('Is Playing: ${_controller.value.isPlaying}'),
-            Text('Is Buffering: ${_controller.value.isBuffering}'),
+            Text('Is Playing: ${controller.value.isPlaying}'),
+            Text('Is Buffering: ${controller.value.isBuffering}'),
           ],
         ),
       ),
@@ -872,16 +980,26 @@ class _BetterPlayerScreenState extends State<BetterPlayerScreen> {
               child: BetterPlayer(controller: _betterPlayerController),
             ),
             const SizedBox(height: 20),
-            _buildBetterPlayerControls(),
+            BetterPlayerControls(controller: _betterPlayerController),
             const SizedBox(height: 20),
-            _buildBetterPlayerInfo(),
+            const BetterPlayerInfo(),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildBetterPlayerControls() {
+class BetterPlayerControls extends StatelessWidget {
+  final BetterPlayerController controller;
+
+  const BetterPlayerControls({
+    super.key,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -920,30 +1038,30 @@ class _BetterPlayerScreenState extends State<BetterPlayerScreen> {
             runSpacing: 8,
             children: [
               ElevatedButton(
-                onPressed: () => _betterPlayerController.play(),
+                onPressed: () => controller.play(),
                 child: const Text('Play'),
               ),
               ElevatedButton(
-                onPressed: () => _betterPlayerController.pause(),
+                onPressed: () => controller.pause(),
                 child: const Text('Pause'),
               ),
               ElevatedButton(
-                onPressed: () => _betterPlayerController.seekTo(Duration.zero),
+                onPressed: () => controller.seekTo(Duration.zero),
                 child: const Text('Restart'),
               ),
               ElevatedButton(
-                onPressed: () => _betterPlayerController.enablePictureInPicture(_betterPlayerController.betterPlayerGlobalKey!),
+                onPressed: () => controller.enablePictureInPicture(controller.betterPlayerGlobalKey!),
                 child: const Text('PiP'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  _betterPlayerController.setVolume(0.5);
+                  controller.setVolume(0.5);
                 },
                 child: const Text('50% Volume'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  _betterPlayerController.setSpeed(2.0);
+                  controller.setSpeed(2.0);
                 },
                 child: const Text('2x Speed'),
               ),
@@ -953,8 +1071,13 @@ class _BetterPlayerScreenState extends State<BetterPlayerScreen> {
       ),
     );
   }
+}
 
-  Widget _buildBetterPlayerInfo() {
+class BetterPlayerInfo extends StatelessWidget {
+  const BetterPlayerInfo({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.all(16),
       child: Padding(
@@ -1055,16 +1178,21 @@ class _PodPlayerScreenState extends State<PodPlayerScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _buildPodPlayerControls(),
+            const PodPlayerControls(),
             const SizedBox(height: 20),
-            _buildPodPlayerInfo(),
+            const PodPlayerInfo(),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildPodPlayerControls() {
+class PodPlayerControls extends StatelessWidget {
+  const PodPlayerControls({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -1107,8 +1235,13 @@ class _PodPlayerScreenState extends State<PodPlayerScreen> {
       ),
     );
   }
+}
 
-  Widget _buildPodPlayerInfo() {
+class PodPlayerInfo extends StatelessWidget {
+  const PodPlayerInfo({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.all(16),
       child: Padding(
