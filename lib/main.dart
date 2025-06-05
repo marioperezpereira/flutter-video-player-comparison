@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:better_player_enhanced/better_player.dart';
+import 'package:video_player/video_player.dart';
+import 'package:better_player/better_player.dart';
 import 'package:pod_player/pod_player.dart';
 
 void main() {
